@@ -8,6 +8,7 @@ use alvr_session::{CodecType, SessionConfig, Settings};
 use serde::{Deserialize, Serialize};
 use serde_json as json;
 use std::{
+    ffi::c_void,
     collections::HashSet,
     fmt::{self, Debug},
     net::IpAddr,
@@ -408,4 +409,16 @@ pub enum ServerRequest {
 pub struct ViewParams {
     pub pose: Pose,
     pub fov: Fov,
+}
+
+#[derive(Clone)]
+#[repr(C)] // only for the C api
+pub struct BufferWithMetadata {
+    pub buffer_ptr: *const c_void, /// `buffer_ptr` must point to a valid AHardwareBuffer.
+    pub buffer_width: u32,
+    pub buffer_height: u32,
+    pub crop_left: i32,
+    pub crop_right: i32,
+    pub crop_top: i32,
+    pub crop_bottom: i32,
 }

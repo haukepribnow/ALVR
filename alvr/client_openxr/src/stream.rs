@@ -14,14 +14,13 @@ use alvr_common::{
     parking_lot::RwLock,
     Pose, RelaxedAtomic, HAND_LEFT_ID, HAND_RIGHT_ID, HEAD_ID,
 };
-use alvr_packets::{FaceData, StreamConfig, ViewParams};
+use alvr_packets::{BufferWithMetadata, FaceData, StreamConfig, ViewParams};
 use alvr_session::{
     ClientsideFoveationConfig, ClientsideFoveationMode, CodecType, FoveatedEncodingConfig,
     MediacodecProperty, PassthroughMode,
 };
 use openxr as xr;
 use std::{
-    ptr,
     rc::Rc,
     sync::Arc,
     thread::{self, JoinHandle},
@@ -325,8 +324,8 @@ impl StreamContext {
             }
         }
 
-        let (timestamp, view_params, buffer_ptr) =
-            if let Some((timestamp, buffer_ptr)) = frame_result {
+        let (timestamp, view_params, buffer_with_metadata) =
+            if let Some((timestamp, ref buffer_with_metadata)) = frame_result {
                 let view_params = self.core_context.report_compositor_start(timestamp);
 
                 // Avoid passing invalid timestamp to runtime
@@ -335,9 +334,9 @@ impl StreamContext {
 
                 self.last_good_view_params = view_params;
 
-                (timestamp, view_params, buffer_ptr)
+                (timestamp, view_params, Some(buffer_with_metadata))
             } else {
-                (vsync_time, self.last_good_view_params, ptr::null_mut())
+                (vsync_time, self.last_good_view_params, None)
             };
 
         let left_swapchain_idx = self.swapchains[0].acquire_image().unwrap();
@@ -352,7 +351,7 @@ impl StreamContext {
 
         unsafe {
             self.renderer.render(
-                buffer_ptr,
+                buffer_with_metadata,
                 [
                     StreamViewParams {
                         swapchain_index: left_swapchain_idx,
@@ -371,7 +370,7 @@ impl StreamContext {
         self.swapchains[0].release_image().unwrap();
         self.swapchains[1].release_image().unwrap();
 
-        if !buffer_ptr.is_null() {
+        if buffer_with_metadata.is_some() {
             if let Some(xr_now) = crate::xr_runtime_now(self.xr_session.instance()) {
                 self.core_context.report_submit(
                     timestamp,

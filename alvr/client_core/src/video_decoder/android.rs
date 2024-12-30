@@ -5,6 +5,7 @@ use alvr_common::{
     parking_lot::{Condvar, Mutex},
     warn, RelaxedAtomic, ToAny,
 };
+use alvr_packets::BufferWithMetadata;
 use alvr_session::{CodecType, MediacodecPropType};
 use ndk::{
     hardware_buffer::HardwareBufferUsage,
@@ -18,7 +19,6 @@ use ndk::{
 };
 use std::{
     collections::VecDeque,
-    ffi::c_void,
     ops::Deref,
     ptr,
     sync::{Arc, Weak},
@@ -97,7 +97,7 @@ unsafe impl Send for VideoDecoderSource {}
 
 impl VideoDecoderSource {
     // The application MUST finish using the returned buffer before calling this function again
-    pub fn dequeue_frame(&mut self) -> Option<(Duration, *mut c_void)> {
+    pub fn dequeue_frame(&mut self) -> Option<(Duration, BufferWithMetadata)> {
         let mut image_queue_lock = self.image_queue.lock();
 
         if let Some(queued_image) = image_queue_lock.front() {
@@ -118,14 +118,21 @@ impl VideoDecoderSource {
         if let Some(queued_image) = image_queue_lock.front_mut() {
             queued_image.in_use = true;
 
+            let hardware_buffer = queued_image.image.hardware_buffer().unwrap();
+            let hardware_buffer_desc = hardware_buffer.describe();
+            let crop_rect = queued_image.image.crop_rect().unwrap();
+
             Some((
                 queued_image.timestamp,
-                queued_image
-                    .image
-                    .hardware_buffer()
-                    .unwrap()
-                    .as_ptr()
-                    .cast(),
+                BufferWithMetadata {
+                    buffer_ptr: hardware_buffer.as_ptr().cast(),
+                    buffer_width: hardware_buffer_desc.width,
+                    buffer_height: hardware_buffer_desc.height,
+                    crop_left: crop_rect.left,
+                    crop_right: crop_rect.right,
+                    crop_top: crop_rect.top,
+                    crop_bottom: crop_rect.bottom
+                }
             ))
         } else {
             // TODO: add back when implementing proper phase sync

@@ -2,6 +2,7 @@
 mod android;
 
 use alvr_common::anyhow::Result;
+use alvr_packets::BufferWithMetadata;
 use alvr_session::{CodecType, MediacodecProperty};
 use std::time::Duration;
 
@@ -39,8 +40,8 @@ pub struct VideoDecoderSource {
 }
 
 impl VideoDecoderSource {
-    /// If a frame is available, return the timestamp and the AHardwareBuffer.
-    pub fn get_frame(&mut self) -> Option<(Duration, *mut std::ffi::c_void)> {
+    /// If a frame is available, return the timestamp and the AHardwareBuffer with its metadata.
+    pub fn get_frame(&mut self) -> Option<(Duration, BufferWithMetadata)> {
         #[cfg(target_os = "android")]
         {
             self.inner.dequeue_frame()

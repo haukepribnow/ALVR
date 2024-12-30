@@ -3,8 +3,9 @@ use alvr_common::{
     glam::{self, Mat4, Quat, UVec2, Vec3},
     Fov,
 };
+use alvr_packets::BufferWithMetadata;
 use alvr_session::{FoveatedEncodingConfig, PassthroughMode};
-use std::{collections::HashMap, ffi::c_void, iter, rc::Rc};
+use std::{collections::HashMap, iter, rc::Rc};
 use wgpu::{
     hal::{api, gles},
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
@@ -213,10 +214,10 @@ impl StreamRenderer {
         }
     }
 
-    pub unsafe fn render(&self, hardware_buffer: *mut c_void, view_params: [StreamViewParams; 2]) {
-        // if hardware_buffer is available copy stream to staging texture
-        if !hardware_buffer.is_null() {
-            self.staging_renderer.render(hardware_buffer);
+    pub unsafe fn render(&self, buffer_with_metadata: Option<&BufferWithMetadata>, view_params: [StreamViewParams; 2]) {
+        // if buffer_with_metadata is available, copy stream to staging texture
+        if let Some(buffer_with_metadata) = buffer_with_metadata {
+            self.staging_renderer.render(buffer_with_metadata);
         }
 
         let mut encoder = self

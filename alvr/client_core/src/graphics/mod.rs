@@ -9,6 +9,7 @@ use alvr_common::{
     glam::{Mat4, UVec2, Vec4},
     Fov,
 };
+use alvr_packets::BufferWithMetadata;
 use glow::{self as gl, HasContext};
 use khronos_egl as egl;
 use std::{ffi::c_void, num::NonZeroU32, ptr};
@@ -362,18 +363,17 @@ impl GraphicsContext {
     }
 
     /// # Safety
-    /// `buffer` must be a valid AHardwareBuffer.
     /// `texture` must be a valid GL texture.
     pub unsafe fn render_ahardwarebuffer_using_texture(
         &self,
-        buffer: *const c_void,
+        buffer_with_metadata: &BufferWithMetadata,
         texture: gl::Texture,
         render_cb: impl FnOnce(),
     ) {
         const EGL_NATIVE_BUFFER_ANDROID: u32 = 0x3140;
 
-        if !buffer.is_null() {
-            let client_buffer = (self.get_native_client_buffer)(buffer);
+        if !buffer_with_metadata.buffer_ptr.is_null() {
+            let client_buffer = (self.get_native_client_buffer)(buffer_with_metadata.buffer_ptr);
             check_error(&self.gl_context, "get_native_client_buffer");
 
             let image = (self.create_image)(

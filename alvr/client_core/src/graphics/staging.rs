@@ -1,8 +1,9 @@
 use super::{ck, GraphicsContext};
 use crate::graphics::GL_TEXTURE_EXTERNAL_OES;
 use alvr_common::glam::{IVec2, UVec2};
+use alvr_packets::BufferWithMetadata;
 use glow::{self as gl, HasContext};
-use std::{ffi::c_void, rc::Rc};
+use std::rc::Rc;
 
 fn create_program(
     gl: &gl::Context,
@@ -52,6 +53,7 @@ pub struct StagingRenderer {
     context: Rc<GraphicsContext>,
     program: gl::Program,
     view_idx_uloc: gl::UniformLocation,
+    crop_uloc: gl::UniformLocation,
     surface_texture: gl::Texture,
     framebuffers: [gl::Framebuffer; 2],
     viewport_size: IVec2,
@@ -94,12 +96,14 @@ impl StagingRenderer {
             ck!(gl.bind_framebuffer(gl::FRAMEBUFFER, None));
 
             let view_idx_uloc = ck!(gl.get_uniform_location(program, "view_idx")).unwrap();
+            let crop_uloc = ck!(gl.get_uniform_location(program, "crop")).unwrap();
 
             Self {
                 context,
                 program,
                 surface_texture,
                 view_idx_uloc,
+                crop_uloc,
                 framebuffers: framebuffers.try_into().unwrap(),
                 viewport_size: view_resolution.as_ivec2(),
             }
@@ -107,12 +111,12 @@ impl StagingRenderer {
     }
 
     #[allow(unused_variables)]
-    pub unsafe fn render(&self, hardware_buffer: *mut c_void) {
+    pub unsafe fn render(&self, buffer_with_metadata: &BufferWithMetadata) {
         let gl = &self.context.gl_context;
         self.context.make_current();
 
         self.context.render_ahardwarebuffer_using_texture(
-            hardware_buffer,
+            buffer_with_metadata,
             self.surface_texture,
             || unsafe {
                 ck!(gl.use_program(Some(self.program)));
@@ -127,7 +131,15 @@ impl StagingRenderer {
                     ck!(gl.active_texture(gl::TEXTURE0));
                     ck!(gl.bind_texture(GL_TEXTURE_EXTERNAL_OES, Some(self.surface_texture)));
                     ck!(gl.bind_sampler(0, None));
+                    
                     ck!(gl.uniform_1_i32(Some(&self.view_idx_uloc), i as i32));
+
+                    let crop_u1 = buffer_with_metadata.crop_left as f32 / buffer_with_metadata.buffer_width as f32;
+                    let crop_v1 = buffer_with_metadata.crop_top as f32 / buffer_with_metadata.buffer_height as f32;
+                    let crop_u2 = buffer_with_metadata.crop_right as f32 / buffer_with_metadata.buffer_width as f32;
+                    let crop_v2 = buffer_with_metadata.crop_bottom as f32 / buffer_with_metadata.buffer_height as f32;
+                    ck!(gl.uniform_4_f32(Some(&self.crop_uloc), crop_u1, crop_v1, crop_u2, crop_v2));
+
                     ck!(gl.draw_arrays(gl::TRIANGLE_STRIP, 0, 4));
                 }
             },

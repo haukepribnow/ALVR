@@ -15,7 +15,7 @@ use alvr_common::{
     parking_lot::Mutex,
     warn, DeviceMotion, Fov, OptLazy, Pose,
 };
-use alvr_packets::{ButtonEntry, ButtonValue, FaceData, ViewParams};
+use alvr_packets::{BufferWithMetadata, ButtonEntry, ButtonValue, FaceData, ViewParams};
 use alvr_session::{CodecType, FoveatedEncodingConfig, MediacodecPropType, MediacodecProperty};
 use std::{
     cell::RefCell,
@@ -828,7 +828,7 @@ pub unsafe extern "C" fn alvr_render_lobby_opengl(
 /// view_params: array of 2
 #[no_mangle]
 pub unsafe extern "C" fn alvr_render_stream_opengl(
-    hardware_buffer: *mut c_void,
+    buffer_with_metadata: *const BufferWithMetadata,
     view_params: *const AlvrStreamViewParams,
 ) {
     STREAM_RENDERER.with_borrow(|renderer| {
@@ -836,7 +836,7 @@ pub unsafe extern "C" fn alvr_render_stream_opengl(
             let left_params = &*view_params;
             let right_params = &*view_params.offset(1);
             renderer.render(
-                hardware_buffer,
+                Some(&*buffer_with_metadata),
                 [
                     StreamViewParams {
                         swapchain_index: left_params.swapchain_index,
@@ -976,10 +976,10 @@ pub extern "C" fn alvr_get_frame(
     out_buffer_ptr: *mut *mut c_void,
 ) -> bool {
     if let Some(source) = &mut *DECODER_SOURCE.lock() {
-        if let Some((timestamp, buffer_ptr)) = source.get_frame() {
+        if let Some((timestamp, buffer_with_metadata)) = source.get_frame() {
             unsafe {
                 *out_timestamp_ns = timestamp.as_nanos() as u64;
-                *out_buffer_ptr = buffer_ptr;
+                *out_buffer_ptr = buffer_with_metadata.buffer_ptr;
             }
 
             true
