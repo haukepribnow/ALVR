@@ -575,8 +575,8 @@ fn connection_pipeline(
 
     let initial_settings = session_manager_lock.settings().clone();
 
-    fn get_view_res(config: FrameSize, default_res: UVec2) -> UVec2 {
-        let res = match config {
+    fn get_view_res(config: FrameSize, default_res: UVec2) -> Vec2 {
+        return match config {
             FrameSize::Scale(scale) => default_res.as_vec2() * scale,
             FrameSize::Absolute { width, height } => {
                 let width = width as f32;
@@ -589,22 +589,28 @@ fn connection_pipeline(
                 )
             }
         };
-
-        UVec2::new(align32(res.x), align32(res.y))
     }
 
-    let stream_view_resolution = get_view_res(
+    fn vec2_to_uvec2(align: bool, vec: Vec2) -> UVec2 {
+        if align {
+            return UVec2::new(align32(vec.x), align32(vec.y));
+        } else {
+            return UVec2::new(vec.x.ceil() as u32, vec.y.ceil() as u32);
+        }
+    }
+
+    let stream_view_resolution = vec2_to_uvec2(false, get_view_res(
         initial_settings.video.transcoding_view_resolution.clone(),
         streaming_caps.default_view_resolution,
-    );
+    ));
 
-    let target_view_resolution = get_view_res(
+    let target_view_resolution = vec2_to_uvec2(false, get_view_res(
         initial_settings
             .video
             .emulated_headset_view_resolution
             .clone(),
         streaming_caps.default_view_resolution,
-    );
+    ));
 
     let fps = {
         let mut best_match = 0_f32;
